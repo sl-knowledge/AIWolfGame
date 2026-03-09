@@ -39,27 +39,50 @@ from pathlib import Path
 from game.game_controller import GameController
 from utils.logger import setup_logger
 from utils.game_utils import load_config, validate_game_config
-from typing import List, Dict
+from typing import List, Dict, Optional
 import copy
 import csv
 from datetime import datetime
 
 def parse_args():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='AI狼人杀模拟器')
+    parser = argparse.ArgumentParser(
+        description='AI狼人杀模拟器 - 基于大语言模型的多智能体狼人杀游戏',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+使用示例:
+  # 自动选择人数局（根据配置的模型数量）
+  python main.py --rounds 1 --delay 0.5
+  
+  # 指定9人局
+  python main.py --preset 9 --rounds 1 --delay 0.5
+  
+  # 调试模式运行
+  python main.py --preset 8 --rounds 1 --debug
+  
+  # 从中断处继续
+  python main.py --resume --rounds 100
+  
+  # 使用自定义配置文件
+  python main.py --ai-config config/my_ai.json --role-config config/my_roles.json
+        """
+    )
     parser.add_argument('--role-config', type=str, default='config/role_config.json', 
-                      help='角色配置文件路径')
+                      help='角色配置文件路径 (默认: config/role_config.json)')
     parser.add_argument('--ai-config', type=str, default='config/ai_config.json',
-                      help='AI配置文件路径')
-    parser.add_argument('--debug', action='store_true', help='是否启用调试模式')
+                      help='AI配置文件路径 (默认: config/ai_config.json)')
+    parser.add_argument('--debug', action='store_true', 
+                      help='启用调试模式，输出更详细的日志信息')
     parser.add_argument('--delay', type=float, default=1.0,
-                      help='每个动作之间的延迟时间(秒)')
+                      help='每个动作之间的延迟时间(秒)，用于控制游戏节奏 (默认: 1.0)')
     parser.add_argument('--rounds', type=int, default=100,
-                      help='要运行的游戏轮数(默认100轮)')
+                      help='要运行的游戏轮数 (默认: 100)')
     parser.add_argument('--resume', action='store_true',
-                      help='是否从上次中断处继续游戏')
+                      help='从上次中断处继续游戏，会读取 logs/checkpoint.json')
     parser.add_argument('--export-path', type=str, default='analysis',
-                      help='评测数据导出路径')
+                      help='评测数据导出路径 (默认: analysis)')
+    parser.add_argument('--preset', type=str, choices=['6', '7', '8', '9', '10', '11', '12'],
+                      help='直接选择预设人数局(6-12人)，不指定则根据模型数量自动询问')
     return parser.parse_args()
 
 def load_checkpoint():
@@ -386,7 +409,9 @@ def update_statistics(statistics: dict, game_result: dict, model_assignments: di
 
 def print_statistics(statistics: dict):
     """打印统计结果"""
-    print("\n=== 游戏统计 ===")
+    print("\n" + "="*60)
+    print("游戏统计总结")
+    print("="*60)
     print(f"总场次: {statistics['total_games']}")
     
     # 添加除零保护
@@ -403,9 +428,9 @@ def print_statistics(statistics: dict):
         if stats["total"] > 0:
             has_role_stats = True
             win_rate = stats["wins"] / stats["total"]
-            print(f"{role}: {win_rate:.2%} ({stats['wins']}/{stats['total']})")
+            print(f"  {role}: {win_rate:.2%} ({stats['wins']}/{stats['total']})")
     if not has_role_stats:
-        print("暂无角色胜率数据")
+        print("  暂无角色胜率数据")
     
     print("\n各模型表现:")
     has_model_stats = False
@@ -413,17 +438,265 @@ def print_statistics(statistics: dict):
         if stats["games"] > 0:
             has_model_stats = True
             win_rate = stats["wins"] / stats["games"]
-            print(f"{model}: 胜率 {win_rate:.2%} ({stats['wins']}/{stats['games']})")
+            print(f"  {model}: 胜率 {win_rate:.2%} ({stats['wins']}/{stats['games']})")
     if not has_model_stats:
-        print("暂无模型表现数据")
+        print("  暂无模型表现数据")
     
     print("\n评估指标平均值:")
     for metric_name, values in statistics["metrics"].items():
         if values:
             avg_value = sum(values) / len(values)
-            print(f"{metric_name}: {avg_value:.2%}")
+            print(f"  {metric_name}: {avg_value:.2%}")
+    print("="*60)
+
+def load_preset_config(preset_num: str) -> Dict:
+    """加载预设配置
+    
+    Args:
+        preset_num: 预设人数(6-12)
+        
+    Returns:
+        Dict: 预设配置
+    """
+    preset_file = 'config/preset_configs.json'
+    try:
+        with open(preset_file, 'r', encoding='utf-8') as f:
+            preset_configs = json.load(f)
+        
+        if preset_num not in preset_configs:
+            print(f"错误：没有找到{preset_num}人局的预设配置")
+            return None
+        
+        preset_data = preset_configs[preset_num]
+        configurations = preset_data["configurations"]
+        
+        print(f"\n{preset_data['name']}")
+        print(f"{preset_data['description']}")
+        print("\n可选配置：")
+        for i, config in enumerate(configurations, 1):
+            print(f"{i}. {config['name']}")
+        
+        while True:
+            choice = input(f"\n请选择配置(1-{len(configurations)})，或输入 'c' 取消: ").strip()
+            if choice.lower() == 'c':
+                return None
+            
+            try:
+                choice_idx = int(choice) - 1
+                if 0 <= choice_idx < len(configurations):
+                    selected_config = configurations[choice_idx]
+                    return {
+                        "preset_name": preset_data['name'],
+                        "config_name": selected_config['name'],
+                        "total_players": int(preset_num),
+                        "werewolf": selected_config.get("werewolf", 0),
+                        "wolf_king": selected_config.get("wolf_king", 0),
+                        "stone_ghost": selected_config.get("stone_ghost", 0),
+                        "white_wolf_king": selected_config.get("white_wolf_king", 0),
+                        "blood_moon_disciple": selected_config.get("blood_moon_disciple", 0),
+                        "seer": selected_config.get("seer", 0),
+                        "witch": selected_config.get("witch", 0),
+                        "hunter": selected_config.get("hunter", 0),
+                        "villager": selected_config.get("villager", 0),
+                        "custom_roles": selected_config.get("custom_roles", {}),
+                        "rules": selected_config.get("rules", {})
+                    }
+                else:
+                    print(f"请输入1-{len(configurations)}之间的数字")
+            except ValueError:
+                print("请输入有效的数字")
+    
+    except Exception as e:
+        logging.error(f"加载预设配置失败: {str(e)}")
+        return None
+
+def select_preset_by_model_count(models: List[str]) -> Optional[Dict]:
+    """根据模型数量选择预设配置
+    
+    Args:
+        models: 可用模型列表
+        
+    Returns:
+        Dict: 选中的预设配置，如果用户取消则返回None
+    """
+    preset_file = 'config/preset_configs.json'
+    try:
+        with open(preset_file, 'r', encoding='utf-8') as f:
+            preset_configs = json.load(f)
+        
+        model_count = len(models)
+        print(f"\n当前配置了 {model_count} 个模型")
+        
+        # 筛选可用的预设（人数 <= 模型数量）
+        available_presets = []
+        for preset_num in ['6', '7', '8', '9', '10', '11', '12']:
+            if preset_num in preset_configs and int(preset_num) <= model_count:
+                available_presets.append((preset_num, preset_configs[preset_num]))
+        
+        if not available_presets:
+            print(f"错误：模型数量({model_count})不足以支持最低6人局")
+            print("请至少配置6个模型才能运行游戏")
+            return None
+        
+        print(f"\n可选的预设局（人数 <= {model_count}）：")
+        for i, (preset_num, preset_data) in enumerate(available_presets, 1):
+            print(f"{i}. {preset_num}人局 - {preset_data['name']}")
+        
+        while True:
+            choice = input(f"\n请选择预设局(1-{len(available_presets)})，或输入 'c' 取消: ").strip()
+            if choice.lower() == 'c':
+                return None
+            
+            try:
+                choice_idx = int(choice) - 1
+                if 0 <= choice_idx < len(available_presets):
+                    preset_num, preset_data = available_presets[choice_idx]
+                    
+                    # 显示该人数下的配置选项
+                    configurations = preset_data["configurations"]
+                    print(f"\n{preset_data['name']}")
+                    print(f"{preset_data['description']}")
+                    print("\n可选配置：")
+                    for i, config in enumerate(configurations, 1):
+                        print(f"{i}. {config['name']}")
+                    
+                    while True:
+                        config_choice = input(f"\n请选择配置(1-{len(configurations)})，或输入 'b' 返回: ").strip()
+                        if config_choice.lower() == 'b':
+                            break
+                        
+                        try:
+                            config_idx = int(config_choice) - 1
+                            if 0 <= config_idx < len(configurations):
+                                selected_config = configurations[config_idx]
+                                return {
+                                    "preset_name": preset_data['name'],
+                                    "config_name": selected_config['name'],
+                                    "total_players": int(preset_num),
+                                    "werewolf": selected_config.get("werewolf", 0),
+                                    "wolf_king": selected_config.get("wolf_king", 0),
+                                    "stone_ghost": selected_config.get("stone_ghost", 0),
+                                    "white_wolf_king": selected_config.get("white_wolf_king", 0),
+                                    "blood_moon_disciple": selected_config.get("blood_moon_disciple", 0),
+                                    "seer": selected_config.get("seer", 0),
+                                    "witch": selected_config.get("witch", 0),
+                                    "hunter": selected_config.get("hunter", 0),
+                                    "villager": selected_config.get("villager", 0),
+                                    "custom_roles": selected_config.get("custom_roles", {}),
+                                    "rules": selected_config.get("rules", {})
+                                }
+                            else:
+                                print(f"请输入1-{len(configurations)}之间的数字")
+                        except ValueError:
+                            print("请输入有效的数字")
+                else:
+                    print(f"请输入1-{len(available_presets)}之间的数字")
+            except ValueError:
+                print("请输入有效的数字")
+    
+    except Exception as e:
+        logging.error(f"加载预设配置失败: {str(e)}")
+        return None
+
+def apply_preset_config(preset_config: Dict, role_config: Dict) -> Dict:
+    """应用预设配置到角色配置
+    
+    Args:
+        preset_config: 预设配置
+        role_config: 原始角色配置
+        
+    Returns:
+        Dict: 更新后的角色配置
+    """
+    updated_config = copy.deepcopy(role_config)
+    
+    # 更新总人数
+    updated_config["game_settings"]["total_players"] = preset_config["total_players"]
+    
+    # 更新角色数量（包括自定义角色）
+    role_counts = {
+        "werewolf": preset_config["werewolf"],
+        "seer": preset_config["seer"],
+        "witch": preset_config["witch"],
+        "hunter": preset_config["hunter"],
+        "villager": preset_config["villager"]
+    }
+    
+    # 添加自定义角色
+    custom_roles = preset_config.get("custom_roles", {})
+    for role_name, count in custom_roles.items():
+        role_counts[role_name] = count
+    
+    # 处理特殊狼人角色（狼王、石像鬼、白狼王、血月使徒）
+    # 这些角色虽然单独列出，但应该计入 werewolf 总数
+    special_wolf_roles = {
+        "wolf_king": preset_config.get("wolf_king", 0),
+        "stone_ghost": preset_config.get("stone_ghost", 0),
+        "white_wolf_king": preset_config.get("white_wolf_king", 0),
+        "blood_moon_disciple": preset_config.get("blood_moon_disciple", 0)
+    }
+    
+    # 将特殊狼人角色添加到 role_counts
+    for role_name, count in special_wolf_roles.items():
+        if count > 0:
+            role_counts[role_name] = count
+    
+    updated_config["role_counts"] = role_counts
+    
+    # 保存特殊狼人角色信息，用于后续处理
+    updated_config["special_wolf_roles"] = special_wolf_roles
+    
+    # 更新玩家列表
+    total_players = preset_config["total_players"]
+    existing_players = role_config.get("players", {})
+    
+    # 如果需要更多玩家，添加新玩家
+    if len(existing_players) < total_players:
+        player_names = ["小欧", "小克", "小深", "小杰", "小千", "小格", "小拉", "小奇", 
+                       "小文", "小博", "小灵", "小默"]
+        personalities = ["狡猾", "激进", "冷静", "谨慎", "果断", "积极", "多疑", "沉稳",
+                        "机智", "勇敢", "理性", "敏锐"]
+        
+        for i in range(len(existing_players), total_players):
+            player_id = f"player{i + 1}"
+            name = player_names[i % len(player_names)]
+            personality = personalities[i % len(personalities)]
+            updated_config["players"][player_id] = {
+                "name": name,
+                "personality": personality
+            }
+    # 如果玩家太多，删除多余的
+    elif len(existing_players) > total_players:
+        players_to_remove = list(existing_players.keys())[total_players:]
+        for player_id in players_to_remove:
+            del updated_config["players"][player_id]
+    
+    # 更新多轮分配配置
+    if "multi_round_assignments" in updated_config:
+        # 获取可用的模型列表
+        available_models = []
+        for round_config in updated_config["multi_round_assignments"]:
+            for player_id, model in round_config["assignments"].items():
+                if model not in available_models:
+                    available_models.append(model)
+        
+        # 更新每轮的分配，确保包含所有当前玩家
+        for round_config in updated_config["multi_round_assignments"]:
+            assignments = {}
+            player_ids = list(updated_config["players"].keys())
+            
+            # 重新分配模型给所有玩家
+            for i, player_id in enumerate(player_ids):
+                # 循环使用模型
+                model = available_models[i % len(available_models)]
+                assignments[player_id] = model
+            
+            round_config["assignments"] = assignments
+    
+    return updated_config
 
 def main():
+    """主函数"""
     # 解析命令行参数
     args = parse_args()
     
@@ -437,13 +710,40 @@ def main():
         role_config = load_config(args.role_config)
         ai_config = load_config(args.ai_config)
         
+        # 获取要评估的模型列表
+        models_to_evaluate = ai_config["evaluation_settings"]["models_to_evaluate"]
+        
+        # 处理预设配置
+        if args.preset:
+            preset_config = load_preset_config(args.preset)
+            if preset_config is None:
+                logger.info("用户取消了预设配置选择")
+                return 0
+            
+            role_config = apply_preset_config(preset_config, role_config)
+            logger.info(f"已应用预设配置: {preset_config['config_name']}")
+        else:
+            # 如果没有指定预设，根据模型数量询问用户选择
+            preset_config = select_preset_by_model_count(models_to_evaluate)
+            if preset_config is None:
+                logger.info("用户取消了预设配置选择")
+                return 0
+            
+            role_config = apply_preset_config(preset_config, role_config)
+            logger.info(f"已应用预设配置: {preset_config['config_name']}")
+        
+        # 验证人数是否满足最低要求
+        total_players = role_config["game_settings"]["total_players"]
+        if total_players < 6:
+            print(f"\n错误：游戏人数不能少于6人（当前：{total_players}人）")
+            print("请使用 --preset 参数选择6-12人局的预设配置")
+            return 1
+        
         # 验证配置
         if not validate_game_config(role_config):
             logger.error("角色配置文件验证失败")
             return 1
         
-        # 获取要评估的模型列表
-        models_to_evaluate = ai_config["evaluation_settings"]["models_to_evaluate"]
         role_rotation_interval = role_config["game_settings"]["role_rotation_interval"]
         
         # 初始化或加载统计数据
@@ -459,50 +759,58 @@ def main():
             else:
                 logger.warning("未找到断点数据，从头开始游戏")
         
-        # 运行指定轮数的游戏
+        use_random_roles = role_config.get("game_settings", {}).get("random_roles", False)
+        
+        # 运行多轮游戏
         for round_num in range(start_round, args.rounds):
             try:
-                # 分配模型到角色
                 model_assignments = get_model_assignments_from_config(role_config, round_num)
                 
-                # 更新角色配置中的AI类型
-                game_roles = copy.deepcopy(role_config["roles"])
-                for role_type, roles in game_roles.items():
-                    for role_id in roles:
-                        roles[role_id]["ai_type"] = model_assignments[role_id]
+                if use_random_roles:
+                    game_config = {
+                        "game_settings": role_config["game_settings"],
+                        "role_counts": role_config.get("role_counts", {}),
+                        "players": role_config.get("players", {}),
+                        "model_assignments": model_assignments,
+                        "ai_players": ai_config["ai_players"],
+                        "delay": args.delay,
+                        "total_rounds": args.rounds
+                    }
+                else:
+                    game_roles = copy.deepcopy(role_config["roles"])
+                    for role_type, roles in game_roles.items():
+                        for role_id in roles:
+                            roles[role_id]["ai_type"] = model_assignments[role_id]
+                    
+                    game_config = {
+                        "roles": game_roles,
+                        "game_settings": role_config["game_settings"],
+                        "ai_players": ai_config["ai_players"],
+                        "delay": args.delay,
+                        "total_rounds": args.rounds
+                    }
                 
-                # 合并配置
-                game_config = {
-                    "roles": game_roles,
-                    "game_settings": role_config["game_settings"],
-                    "ai_players": ai_config["ai_players"],
-                    "delay": args.delay,
-                    "total_rounds": args.rounds
-                }
-                
-                # 创建游戏实例
                 logger.info(f"正在初始化第 {round_num + 1} 轮游戏...")
                 game = GameController(game_config)
                 
-                # 运行游戏
-                print(f"\n=== 第 {round_num + 1}/{args.rounds} 轮游戏开始 ===")
-                print("本轮角色分配:")
+                print(f"\n{'='*60}")
+                print(f"第 {round_num + 1}/{args.rounds} 轮游戏开始")
+                print('='*60)
+                print("本轮模型分配:")
                 for role_id, model in model_assignments.items():
-                    print(f"{role_id}: {model}")
-                print("\n")
+                    print(f"  {role_id}: {model}")
+                print()
                 
                 logger.info("游戏开始...")
                 game.run_game()
                 
-                # 获取游戏结果并更新统计
                 game_result = game.game_state
                 update_statistics(statistics, game_result, model_assignments)
                 
-                # 每轮结束后保存断点和导出分析
                 save_checkpoint(round_num + 1, statistics)
                 export_analysis(statistics, ai_config, args.export_path)
                 
-                print(f"\n=== 第 {round_num + 1} 轮游戏结束 ===\n")
+                print(f"\n第 {round_num + 1} 轮游戏结束")
                 logger.info("游戏结束")
                 
             except KeyboardInterrupt:
@@ -522,16 +830,22 @@ def main():
         
     except FileNotFoundError as e:
         logger.error(f"配置文件不存在: {str(e)}")
+        print(f"\n错误：配置文件不存在 - {str(e)}")
+        print("请确保已创建配置文件，或从示例文件复制:")
+        print("  cp config/ai_config.example.json config/ai_config.json")
+        print("  cp config/role_config.example.json config/role_config.json")
         return 1
     except json.JSONDecodeError as e:
         logger.error(f"配置文件格式错误: {str(e)}")
+        print(f"\n错误：配置文件格式错误 - {str(e)}")
         return 1
     except Exception as e:
         logger.error(f"游戏运行出错: {str(e)}", exc_info=True)
+        print(f"\n错误：游戏运行出错 - {str(e)}")
         return 1
     
     return 0
 
 if __name__ == "__main__":
     exit_code = main()
-    exit(exit_code) 
+    exit(exit_code)

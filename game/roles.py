@@ -17,6 +17,10 @@ class RoleType(Enum):
     SEER = "seer"        # 预言家
     WITCH = "witch"      # 女巫
     HUNTER = "hunter"    # 猎人
+    GUARD = "guard"      # 守卫
+    IDIOT = "idiot"      # 白痴
+    WOLF_KING = "wolf_king"  # 狼王
+    KNIGHT = "knight"    # 骑士
 
 class BaseRole:
     def __init__(self, player_id: str, name: str, role_type: RoleType):
@@ -24,6 +28,7 @@ class BaseRole:
         self.name = name
         self.role_type = role_type
         self.is_alive = True
+        self.is_sheriff = False  # 是否是警长
         self.used_skills = set()  # 记录已使用的技能
         self.logger = logging.getLogger(__name__)
 
@@ -33,7 +38,7 @@ class BaseRole:
 
     def is_god(self) -> bool:
         """判断是否是神职"""
-        return self.role_type in [RoleType.SEER, RoleType.WITCH, RoleType.HUNTER]
+        return self.role_type in [RoleType.SEER, RoleType.WITCH, RoleType.HUNTER, RoleType.GUARD, RoleType.IDIOT, RoleType.KNIGHT]
 
 class Werewolf(BaseRole):
     def __init__(self, player_id: str, name: str):
@@ -169,3 +174,170 @@ class Hunter(BaseRole):
             self.logger.info("猎人开枪了")
         else:
             self.logger.warning("猎人无法开枪")
+
+class Guard(BaseRole):
+    """守卫角色"""
+    def __init__(self, player_id: str, name: str):
+        super().__init__(player_id, name, RoleType.GUARD)
+        self.last_guarded = None  # 上一晚守护的玩家ID
+        self.can_guard = True  # 是否可以守护
+
+    def can_guard_target(self, target_id: str, same_guard_same_target: bool = False) -> bool:
+        """检查是否可以守护目标
+        
+        Args:
+            target_id: 目标玩家ID
+            same_guard_same_target: 是否允许连续守护同一目标
+            
+        Returns:
+            bool: 是否可以守护
+        """
+        if not self.is_alive:
+            self.logger.debug("守卫已死亡，无法守护")
+            return False
+        if not same_guard_same_target and target_id == self.last_guarded:
+            self.logger.debug("不能连续两晚守护同一人")
+            return False
+        return True
+
+    def guard_player(self, target_id: str) -> None:
+        """守护目标玩家
+        
+        Args:
+            target_id: 目标玩家ID
+        """
+        self.last_guarded = target_id
+        self.logger.info(f"守卫守护了玩家 {target_id}")
+
+    def reset_round(self) -> None:
+        """重置回合状态"""
+        pass
+
+class Idiot(BaseRole):
+    """白痴角色"""
+    def __init__(self, player_id: str, name: str):
+        super().__init__(player_id, name, RoleType.IDIOT)
+        self.revealed = False  # 是否已经翻牌
+        self.can_vote = True  # 是否可以投票
+        self.can_be_voted = True  # 是否可以被投票
+
+    def can_reveal(self) -> bool:
+        """检查是否可以翻牌
+        
+        Returns:
+            bool: 是否可以翻牌
+        """
+        if not self.is_alive:
+            self.logger.debug("白痴已死亡，无法翻牌")
+            return False
+        if self.revealed:
+            self.logger.debug("白痴已经翻牌过了")
+            return False
+        return True
+
+    def reveal(self) -> None:
+        """翻牌免死"""
+        if self.can_reveal():
+            self.revealed = True
+            self.can_vote = False
+            self.can_be_voted = False
+            self.logger.info("白痴翻牌免死，失去投票权和被投票权")
+        else:
+            self.logger.warning("白痴无法翻牌")
+
+class WolfKing(BaseRole):
+    """狼王角色"""
+    def __init__(self, player_id: str, name: str):
+        super().__init__(player_id, name, RoleType.WEREWOLF)
+        self.can_shoot = True  # 是否可以开枪
+        self.death_confirmed = False  # 是否确认死亡
+        self.can_explode = True  # 是否可以自爆
+
+    def can_use_gun(self) -> bool:
+        """检查是否可以开枪
+        
+        Returns:
+            bool: 是否可以开枪
+        """
+        if not self.death_confirmed:
+            self.logger.debug("狼王未确认死亡，不能开枪")
+            return False
+        if not self.can_shoot:
+            self.logger.debug("狼王已经开过枪了")
+            return False
+        return True
+
+    def confirm_death(self) -> None:
+        """确认死亡状态"""
+        self.death_confirmed = True
+        self.logger.info("狼王死亡已确认")
+
+    def use_gun(self) -> None:
+        """使用开枪技能"""
+        if self.can_use_gun():
+            self.can_shoot = False
+            self.logger.info("狼王开枪了")
+        else:
+            self.logger.warning("狼王无法开枪")
+
+    def can_explode(self) -> bool:
+        """检查是否可以自爆
+        
+        Returns:
+            bool: 是否可以自爆
+        """
+        if not self.is_alive:
+            self.logger.debug("狼王已死亡，无法自爆")
+            return False
+        if not self.can_explode:
+            self.logger.debug("狼王已经自爆过了")
+            return False
+        return True
+
+    def explode(self) -> None:
+        """自爆"""
+        if self.can_explode():
+            self.can_explode = False
+            self.logger.info("狼王自爆了")
+        else:
+            self.logger.warning("狼王无法自爆")
+
+class Knight(BaseRole):
+    """骑士角色"""
+    def __init__(self, player_id: str, name: str):
+        super().__init__(player_id, name, RoleType.KNIGHT)
+        self.can_challenge = True  # 是否可以挑战
+        self.challenged = False  # 是否已经挑战过
+
+    def can_challenge_player(self, target_id: str) -> bool:
+        """检查是否可以挑战目标
+        
+        Args:
+            target_id: 目标玩家ID
+            
+        Returns:
+            bool: 是否可以挑战
+        """
+        if not self.is_alive:
+            self.logger.debug("骑士已死亡，无法挑战")
+            return False
+        if not self.can_challenge:
+            self.logger.debug("骑士已经挑战过了")
+            return False
+        if target_id == self.player_id:
+            self.logger.debug("骑士不能挑战自己")
+            return False
+        return True
+
+    def challenge(self, target_id: str) -> None:
+        """挑战目标玩家
+        
+        Args:
+            target_id: 目标玩家ID
+        """
+        if self.can_challenge_player(target_id):
+            self.can_challenge = False
+            self.challenged = True
+            self.logger.info(f"骑士挑战了玩家 {target_id}")
+        else:
+            self.logger.warning("骑士无法挑战")

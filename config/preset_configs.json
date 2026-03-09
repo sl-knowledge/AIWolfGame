@@ -1,0 +1,369 @@
+{
+  "6": {
+    "name": "6人局（纯新手入门·极简速推局）",
+    "description": "节奏最快，无复杂机制，适合纯新手熟悉核心逻辑",
+    "configurations": [
+      {
+        "name": "全网通用标准配置",
+        "werewolf": 2,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 0,
+        "villager": 2,
+        "rules": {
+          "win_condition": "屠边",
+          "witch_self_save": true,
+          "witch_same_night": false,
+          "all_last_words": true,
+          "sheriff_election": false,
+          "wolf_self_explode": false
+        }
+      },
+      {
+        "name": "官方极简变种配置",
+        "werewolf": 2,
+        "seer": 1,
+        "witch": 0,
+        "hunter": 0,
+        "villager": 3,
+        "rules": {
+          "win_condition": "屠边",
+          "all_last_words": true,
+          "sheriff_election": false
+        }
+      }
+    ]
+  },
+  "7": {
+    "name": "7人局（娱乐过渡·灵活速推局）",
+    "description": "人数灵活，多为熟人娱乐局，可选开启基础进阶机制",
+    "configurations": [
+      {
+        "name": "主流标准配置",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 0,
+        "villager": 2,
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "last_words": "首夜+白天放逐"
+        }
+      },
+      {
+        "name": "进阶变种配置-猎魔人局",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 0,
+        "hunter": 0,
+        "villager": 2,
+        "custom_roles": {
+          "猎魔人": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true
+        }
+      }
+    ]
+  },
+  "8": {
+    "name": "8人局（新手进阶·逻辑入门局）",
+    "description": "引入多神职与完整基础机制，是新手向进阶的过渡配置",
+    "configurations": [
+      {
+        "name": "官方标准配置",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 0,
+        "villager": 3,
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "double_explode_no_sheriff": true,
+          "last_words": "首夜+白天放逐"
+        }
+      },
+      {
+        "name": "竞技向变种配置-预女猎局",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 2,
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "double_explode_no_sheriff": true
+        }
+      }
+    ]
+  },
+  "9": {
+    "name": "9人局（全网最火·新手黄金标准局）",
+    "description": "狼人杀入门首选配置，平衡度拉满，所有官方平台均设标准场",
+    "configurations": [
+      {
+        "name": "官方标准配置（预女猎白板子）",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 3,
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "double_explode_no_sheriff": true,
+          "witch_self_save": "新手局",
+          "witch_same_night": false,
+          "hunter_can_shoot": "非毒杀+非殉情",
+          "last_words": "首夜+白天放逐"
+        }
+      },
+      {
+        "name": "进阶变种配置-守卫局",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 0,
+        "villager": 3,
+        "custom_roles": {
+          "守卫": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "double_explode_no_sheriff": true
+        }
+      }
+    ]
+  },
+  "10": {
+    "name": "10人局（进阶娱乐·平衡竞技局）",
+    "description": "逻辑复杂度进一步提升，多为进阶玩家娱乐场",
+    "configurations": [
+      {
+        "name": "主流标准配置",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "witch_self_save": false,
+          "same_guard_same_target": true
+        }
+      },
+      {
+        "name": "竞技变种配置-预女猎守局",
+        "werewolf": 3,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 3,
+        "custom_roles": {
+          "守卫": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "witch_self_save": false,
+          "same_guard_same_target": true
+        }
+      }
+    ]
+  },
+  "11": {
+    "name": "11人局（补位娱乐·灵活竞技局）",
+    "description": "非官方固定标准局，多为玩家补位临时组局",
+    "configurations": [
+      {
+        "name": "最常用平衡配置",
+        "werewolf": 4,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "witch_self_save": false
+        }
+      },
+      {
+        "name": "进阶变种配置-狼王守卫局",
+        "werewolf": 3,
+        "wolf_king": 1,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 3,
+        "custom_roles": {
+          "守卫": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "witch_self_save": false
+        }
+      }
+    ]
+  },
+  "12": {
+    "name": "12人局（官方赛事·竞技核心局）",
+    "description": "狼人杀官方标准竞技人数，配置最丰富、平衡度最高",
+    "configurations": [
+      {
+        "name": "新手入门标准板（预女猎白）",
+        "werewolf": 4,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "custom_roles": {
+          "白痴": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "double_explode_no_sheriff": true,
+          "witch_self_save": "首夜",
+          "witch_same_night": false,
+          "idiot_can_survive": true,
+          "hunter_can_shoot": "非毒杀+非殉情",
+          "last_words": "首夜+白天放逐"
+        }
+      },
+      {
+        "name": "狼王守卫局",
+        "werewolf": 3,
+        "wolf_king": 1,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "custom_roles": {
+          "守卫": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "double_explode_no_sheriff": true,
+          "wolf_king_can_shoot": true,
+          "wolf_king_cannot_shoot": "被毒+殉情",
+          "guard_cannot_same_target": true
+        }
+      },
+      {
+        "name": "石像鬼守墓人局",
+        "werewolf": 3,
+        "stone_ghost": 1,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "custom_roles": {
+          "守墓人": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "stone_ghost_check_identity": true,
+          "gravekeeper_check_identity": true
+        }
+      },
+      {
+        "name": "白狼王骑士局",
+        "werewolf": 3,
+        "white_wolf_king": 1,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "custom_roles": {
+          "骑士": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "white_wolf_king_explode": true,
+          "knight_challenge": true
+        }
+      },
+      {
+        "name": "血月使徒猎魔人局",
+        "werewolf": 3,
+        "blood_moon_disciple": 1,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "custom_roles": {
+          "猎魔人": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "blood_moon_explode": true,
+          "blood_moon_block_abilities": true,
+          "demon_hunter_hunt": true
+        }
+      },
+      {
+        "name": "丘比特情侣局（第三方阵营）",
+        "werewolf": 4,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "custom_roles": {
+          "丘比特": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "cupid_link_lovers": true,
+          "third_party": "情侣+丘比特"
+        }
+      },
+      {
+        "name": "奇迹商人局",
+        "werewolf": 4,
+        "seer": 1,
+        "witch": 1,
+        "hunter": 1,
+        "villager": 4,
+        "custom_roles": {
+          "奇迹商人": 1
+        },
+        "rules": {
+          "win_condition": "屠边",
+          "sheriff_election": true,
+          "wolf_self_explode": true,
+          "miracle_merchant_give_skill": true,
+          "miracle_merchant_death_if_wolf": true
+        }
+      }
+    ]
+  }
+}

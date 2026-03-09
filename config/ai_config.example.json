@@ -1,24 +1,64 @@
 {
+  "evaluation_settings": {
+    "models_to_evaluate": ["GPT4O", "CLAUDE", "DEEPSEEK", "GEMINI", "QWEN", "GROK", "LLAMA", "KIMI"],
+    "export_format": ["json"]
+  },
   "ai_players": {
-    "gpt-4": {
-      "baseurl": "https://api.openai.com/v1",
-      "api_key": "sk-your-key-here",
-      "model": "gpt-4",
+    "GPT4O": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "gpt-4o-2024-11-20",
       "retry_attempts": 3,
       "timeout": 30
     },
-    "claude-2": {
-      "baseurl": "https://api.anthropic.com/v1",
-      "api_key": "sk-your-key-here",
-      "model": "claude-2",
+    "CLAUDE": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "claude-3-5-sonnet-20241022",
       "retry_attempts": 3,
       "timeout": 30
     },
-    "local-llama": {
-      "baseurl": "http://localhost:8000",
-      "model": "llama-2-13b",
+    "DEEPSEEK": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "deepseek-chat",
+      "retry_attempts": 3,
+      "timeout": 30
+    },
+    "GEMINI": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "gemini-2.0-flash",
+      "retry_attempts": 3,
+      "timeout": 30
+    },
+    "QWEN": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "qwen-max-latest",
+      "retry_attempts": 3,
+      "timeout": 30
+    },
+    "GROK": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "grok-3",
+      "retry_attempts": 3,
+      "timeout": 30
+    },
+    "LLAMA": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "llama3-70b-8192",
+      "retry_attempts": 3,
+      "timeout": 30
+    },
+    "KIMI": {
+      "baseurl": "https://your-api-endpoint.com/v1",
+      "api_key": "your-api-key-here",
+      "model": "kimi-k2-0711-preview",
       "retry_attempts": 3,
       "timeout": 30
     }
   }
-} 
+}
