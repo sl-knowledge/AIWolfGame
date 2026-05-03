@@ -1338,7 +1338,11 @@ class GameController:
 """
         
         response = agent.ask_ai(prompt, None, self.game_state)
-        return "竞选" in response or "举手" in response
+        if re.search(r'\b竞选\b', response) and not re.search(r'不竞选|不要竞选|放弃竞选', response):
+            return True
+        if "举手" in response:
+            return True
+        return False
 
     def _generate_campaign_speech_prompt(self, role, candidates) -> str:
         """生成竞选发言提示词"""
