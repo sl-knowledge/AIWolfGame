@@ -68,6 +68,30 @@ cp config/role_config.example.json config/role_config.json
 
 编辑 `config/ai_config.json`，配置你的API密钥：
 
+> [!NOTE]
+>
+> 此处 `show_reasoning` 不会传递给 API，只作为控制程序是否输出思考内容时使用。
+> 
+> 部分大模型具有深度思考功能，在输出最终回答之前，模型会先输出一段思维链内容，以提升最终答案的准确性。`show_reasoning` 选项用于控制程序是否将模型的思考内容展示出来。
+>
+> 考虑到部分模型思考较为简单，而部分模型思考较为冗长，本选项分模型设置。每个模型都有对应的 `show_reasoning` 选项，可以单独控制每个模型思考输出与否。
+> 
+> 如有传入 extra_body 的需要，可直接添加一项 `extra_body`，内容将原样传递给模型。例如，控制 DeepSeek 思考模式的开关，可以这样写：
+> 
+> ```json 
+> "DEEPSEEK-PRO-REASONING": {
+>       "baseurl": "https://api.deepseek.com",
+>       "api_key": "sk-*************************",
+>       "model": "deepseek-v4-pro",
+>       "extra_body": {"thinking": {"type": "enabled"}},
+>       "retry_attempts": 3,
+>       "timeout": 30,
+>       "show_reasoning": true
+>     },
+> ```
+> 
+> 其他模型的其他 `extra_body` 参数，可在各模型的官网中详细查看。
+
 ```json
 {
   "evaluation_settings": {
@@ -80,7 +104,8 @@ cp config/role_config.example.json config/role_config.json
       "api_key": "your-api-key-here",
       "model": "gpt-4o-2024-11-20",
       "retry_attempts": 3,
-      "timeout": 30
+      "timeout": 30,
+      "show_reasoning": true
     }
   }
 }
