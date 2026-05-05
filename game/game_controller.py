@@ -1538,6 +1538,8 @@ class GameController:
 请说明你的警徽流计划：
 - 如果你死亡，希望把警徽传给谁？
 - 为什么要传给这个人？
+- 指定警徽流时，必须使用"警徽流传给[player数字]"或"传给[player数字]"这样的格式来明确指出你的投票目标。
+- player ID必须是完整的格式，如player1、player2。
 
 发言要清晰有力，展现警长的领导力！
 """
@@ -1570,10 +1572,12 @@ class GameController:
         
         # 匹配警徽流相关表述
         patterns = [
-            r'警徽流[传给给](\w+)',
-            r'警徽给(\w+)',
-            r'传给(\w+)',
-            r'给(\w+)',
+            r'警徽流(?:传给|给)?\s*\[([^\]]+)\]',   # 警徽流[player3] / 警徽流传给[player3] / 警徽流给[player3]
+            r'警徽流(?:传给|给)?[：:]\s*(\w+\d*)',   # 警徽流：player3 / 警徽流传给：player3 / 警徽流给：player3
+            r'警徽流(?:传给|给)?\s*(\w+\d+)',        # 警徽流player3 / 警徽流传给player3 / 警徽流给player3
+            r'(?:传给|给)\[([^\]]+)\]',             # 传给[player3] / 给[player3]
+            r'(?:传给|给)[：:]\s*(\w+\d+)',          # 传给：player3 / 给：player3
+            r'(?:传给|给)\s*(\w+\d+)',              # 传给player3 / 给player3
         ]
         
         for pattern in patterns:
