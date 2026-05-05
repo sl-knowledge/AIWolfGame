@@ -1635,7 +1635,9 @@ class GameController:
             
             response = agent.ask_ai(prompt, None, self.game_state)
             
-            if "自爆" in response or "爆炸" in response:
+            if "不自爆" in response or "不爆炸" in response:
+                return False
+            elif "自爆" in response or "爆炸" in response:
                 print(f"\n💥 {wolf.name} 选择自爆！")
                 self._handle_wolf_explode(wolf_id)
                 return True
