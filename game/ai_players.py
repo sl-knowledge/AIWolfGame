@@ -85,24 +85,91 @@ class BaseAIAgent:
             base_url=config.get("baseurl")
         )
 
-    def ask_ai(self, prompt: str, system_prompt: str = None, game_state: Dict = None) -> str:
-        """统一的 AI 调用接口"""
+    def ask_ai(self, prompt, system_prompt=None, game_state=None, stream=True, speaker_name=None):
+        """
+        统一的 AI 调用接口，默认开启流式输出（逐字打印到终端）
+        - speaker_name: 若提供，则在思考/发言前显示角色标签
+        - 通过 config['show_reasoning'] 控制是否显示思考过程
+        """
+        GRAY = '\033[90m'
+        RESET = '\033[0m'
+        show_reasoning = self.config["show_reasoning"]
+
         try:
             messages = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
             messages.append({"role": "user", "content": prompt})
-            
-            response = self.client.chat.completions.create(
-                model=self.config["model"],
-                messages=messages
-            )
-            return response.choices[0].message.content
+
+            if stream:
+                stream_response = self.client.chat.completions.create(
+                    model=self.config["model"],
+                    messages=messages,
+                    stream=True,
+                    extra_body=self.config["extra_body"]
+                )
+                collected_content = []
+                state = 'start'  # 'start', 'reasoning', 'content'
+
+                for chunk in stream_response:
+                    if not chunk.choices or not chunk.choices[0].delta:
+                        continue
+
+                    delta = chunk.choices[0].delta
+                    reasoning = getattr(delta, 'reasoning_content', None)
+                    content = delta.content
+
+                    # ----- 推理内容（仅在需要显示时处理） -----
+                    if reasoning and show_reasoning:
+                        if state == 'start':
+                            if speaker_name:
+                                print(f"💭 {speaker_name} 的想法：\n{GRAY}", end='', flush=True)
+                            else:
+                                print(f"💭 {GRAY}", end='', flush=True)
+                            state = 'reasoning'
+                        elif state == 'content':
+                            # 从发言切换回推理：重置颜色 + 换行
+                            print(f"{RESET}\n\n💭 {GRAY}", end='', flush=True)
+                            state = 'reasoning'
+                        print(reasoning, end='', flush=True)
+
+                    # 当不显示推理时，完全忽略 reasoning，也不改变 state
+                    # （无需额外分支，静默跳过即可）
+
+                    # ----- 正常内容 -----
+                    if content:
+                        if state == 'start':
+                            if speaker_name:
+                                print(f"💬 {speaker_name} 的发言：\n", end='', flush=True)
+                            else:
+                                print("💬 ", end='', flush=True)
+                            state = 'content'
+                        elif state == 'reasoning':
+                            # 从推理切换到发言：重置颜色 + 换行 + 角色标签（如果有）
+                            if speaker_name:
+                                print(f"{RESET}\n\n💬 {speaker_name} 的发言：\n", end='', flush=True)
+                            else:
+                                print(f"{RESET}\n\n💬 ", end='', flush=True)
+                            state = 'content'
+                        # 输出本次内容
+                        print(content, end='', flush=True)
+                        collected_content.append(content)
+
+                print(RESET)  # 确保最后颜色复原
+                return ''.join(collected_content)
+
+            else:
+                # 非流式备用
+                response = self.client.chat.completions.create(
+                    model=self.config["model"],
+                    messages=messages,
+                    extra_body=self.config.get("extra_body", None)
+                )
+                return response.choices[0].message.content
+
         except Exception as e:
-            error_msg = str(e)
-            logging.error(f"AI 调用失败: {error_msg}")
-            
-            # API错误时返回弃票
+            logging.error(f"AI 调用失败: {e}")
+            import random
             excuses = [
                 "刚才网络有点卡，没看清前面的讨论",
                 "刚才走神了，能再说一下情况吗",
@@ -111,80 +178,58 @@ class BaseAIAgent:
                 "我这边信号不好，刚才没听清"
             ]
             excuse = random.choice(excuses)
-            return f"【皱眉思考】{excuse}。这一轮我选择弃票，需要更多信息才能做出判断。弃票"
-
+            fallback_text = f"【皱眉思考】{excuse}。这一轮我选择弃票，需要更多信息才能做出判断。弃票"
+            print(fallback_text)
+            return fallback_text
+    
     def _extract_target(self, response: str) -> Optional[str]:
-        """从 AI 响应中提取目标玩家 ID
-        
-        Args:
-            response: AI的完整响应文本
-        
-        Returns:
-            str: 目标玩家ID，如果没有找到则返回None
-        """
         try:
-            # 检查是否弃票
-            if re.search(r'弃票|放弃投票|不投票|暂不投票|跳过投票', response):
-                return None
-            
-            # 使用正则表达式匹配以下格式：
-            # 1. 选择[玩家ID]
-            # 2. 选择 玩家ID
-            # 3. 选择：玩家ID
-            # 4. (玩家ID)
-            # 5. 玩家ID(xxx)
-            # 6. 我选择 玩家ID
-            # 7. 投票给 玩家ID
-            # 8. 怀疑 玩家ID
-            patterns = [
+            # 1. 明确的投票
+            vote_patterns = [
                 r'选择\[([^\]]+)\]',             # 匹配 选择[player1] 
                 r'选择[：:]\s*(\w+\d*)',          # 匹配 选择：player1
-                r'选择\s+(\w+\d*)',              # 匹配 选择 player1
+                r'选择\s*(\w+\d*)',              # 匹配 选择 player1
                 r'我[的]?选择[是为]?\s*[：:"]?\s*(\w+\d*)',  # 匹配 我选择是player1
                 r'投票(给|选择|选)\s*[：:"]?\s*(\w+\d*)',   # 匹配 投票给player1
+            ]
+            for pattern in vote_patterns:
+                match = re.search(pattern, response)
+                if match:
+                    target = match.group(match.lastindex or 1).strip()
+                    if re.match(r'^player\d+$', target):
+                        return target
+
+            # 2. 弃票
+            if re.search(r'弃票|放弃投票|不投票|暂不投票|跳过投票', response):
+                return None
+
+            # 3. 模糊不定的投票兜底
+            guess_patterns = [
                 r'[我认为]*(\w+\d+)[最非常]*(可疑|是狼人|有问题)',  # 匹配 player1最可疑
                 r'[决定|准备]*(投|投票|票)[给向](\w+\d+)',  # 匹配 投给player1
                 r'\((\w+\d*)\)',                 # 匹配 (player1)
                 r'([a-zA-Z]+\d+)\s*\(',          # 匹配 player1(
                 r'.*\b(player\d+)\b.*',          # 最宽松匹配，尝试找到任何player+数字
             ]
-            
-            # 首先尝试专用格式
-            for i, pattern in enumerate(patterns):
-                # 投票给player1 特殊处理
-                if i == 4:  # 第5个模式需要特殊处理第二个捕获组
-                    matches = re.findall(pattern, response)
-                    if matches:
-                        for match in matches:
-                            if isinstance(match, tuple) and len(match) > 1:
-                                target = match[1].strip()
-                                if re.match(r'^player\d+$', target):
-                                    return target
-                else:
-                    matches = re.findall(pattern, response)
-                    if matches:
-                        # 提取玩家ID，去除可能的额外空格和括号
-                        target = matches[-1].strip('()[]"\'：: ').strip()
-                        # 验证是否是有效的玩家ID格式
-                        if re.match(r'^player\d+$', target):
-                            return target
-            
-            # 如果上面的模式都没匹配到，尝试简单提取任何player+数字
-            all_player_ids = re.findall(r'player\d+', response)
-            if all_player_ids:
-                return all_player_ids[-1]  # 返回最后一个匹配到的ID
-            
+            for pattern in guess_patterns:
+                match = re.search(pattern, response)
+                if match:
+                    groups = match.groups()
+                    target = next((g for g in reversed(groups) if g and re.match(r'^player\d+$', g)), None)
+                    if target:
+                        return target
+
             self.logger.warning(f"无法从响应中提取有效的目标ID: {response}")
             return None
-        
+
         except Exception as e:
             self.logger.error(f"提取目标ID时出错: {str(e)}")
             return None
-
-    def discuss(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
+        
+    def discuss(self, game_state: Dict[str, Any], speaker_name: Optional[str] = None) -> Dict[str, Any]:
         """讨论阶段"""
         prompt = self._generate_discussion_prompt(game_state)
-        response = self.ask_ai(prompt, self._get_discussion_prompt(), game_state)
+        response = self.ask_ai(prompt, self._get_discussion_prompt(), game_state, speaker_name=speaker_name)
         
         # 记录讨论，包含说话者信息
         self.memory.add_conversation({
@@ -429,11 +474,11 @@ class WerewolfAgent(BaseAIAgent):
         super().__init__(config, role)
         self.team_members: List[str] = []  # 狼队友列表
 
-    def discuss(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
+    def discuss(self, game_state: Dict[str, Any], speaker_name: Optional[str] = None) -> Dict[str, Any]:
         """狼人讨论"""
         prompt = self._generate_discussion_prompt(game_state)
-        response = self.ask_ai(prompt, self._get_werewolf_discussion_prompt(), game_state)
-        
+        response = self.ask_ai(prompt, self._get_werewolf_discussion_prompt(), game_state, speaker_name=speaker_name)
+            
         # 记录讨论
         self.memory.add_conversation({
             "round": game_state["current_round"],
@@ -554,10 +599,10 @@ class WerewolfAgent(BaseAIAgent):
         """
 
 class VillagerAgent(BaseAIAgent):
-    def discuss(self, game_state: Dict[str, Any]) -> str:
+    def discuss(self, game_state: Dict[str, Any], speaker_name: Optional[str] = None) -> Dict[str, Any]:
         """村民讨论发言"""
         prompt = self._generate_discussion_prompt(game_state)
-        response = self.ask_ai(prompt, self._get_villager_discussion_prompt(), game_state)
+        response = self.ask_ai(prompt, self._get_villager_discussion_prompt(), game_state, speaker_name=speaker_name)
         
         # 记录讨论
         self.memory.add_conversation({
@@ -1052,10 +1097,10 @@ class WolfKingAgent(BaseAIAgent):
         self.role: WolfKing = role
         self.team_members: List[str] = []
 
-    def discuss(self, game_state: Dict[str, Any]) -> Dict[str, Any]:
+    def discuss(self, game_state: Dict[str, Any], speaker_name: Optional[str] = None) -> Dict[str, Any]:
         """狼王讨论"""
         prompt = self._generate_discussion_prompt(game_state)
-        response = self.ask_ai(prompt, self._get_wolf_king_discussion_prompt(), game_state)
+        response = self.ask_ai(prompt, self._get_villager_discussion_prompt(), game_state, speaker_name=speaker_name)
         
         self.memory.add_conversation({
             "round": game_state["current_round"],
