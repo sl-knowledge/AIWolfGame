@@ -165,6 +165,7 @@ python main.py --preset 8 --rounds 1 --debug
 | GROK | xAI Grok | grok-3 |
 | LLAMA | Meta Llama | llama3-70b-8192 |
 | KIMI | Moonshot Kimi | kimi-k2-0711-preview |
+| MINIMAX | MiniMax | Minimax-M2.7 |
 
 ### 预设游戏配置
 
