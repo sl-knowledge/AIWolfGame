@@ -4,6 +4,14 @@
     "export_format": ["json"]
   },
   "ai_players": {
+    "MINIMAX": {
+      "baseurl": "https://api.minimax.chat/v1",
+      "api_key": "your-minimax-api-key",
+      "model": "Minimax-M2.7",
+      "show_reasoning": true,
+      "retry_attempts": 3,
+      "timeout": 30
+    },
     "GPT4O": {
       "baseurl": "https://your-api-endpoint.com/v1",
       "api_key": "your-api-key-here",
